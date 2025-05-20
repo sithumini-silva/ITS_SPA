@@ -1,879 +1,812 @@
-//////////////////// Item Related jQueries /////////////////////////////
-
-// To store item details on an array / db
-let item_db = [];
-
-generateNextItemId();
-
-// to load stored item details on the table
-function loadItemsOnTable() {
-
-    $('#item_tbody').empty();
-
-    item_db.map((item, index) => {
-        let name = item.name;
-        let price = item.price;
-        let qoh = item.qoh;
-
-        let data = `<tr>
-                      <td>${'I' + String(index + 1).padStart(3, '0')}</td>
-                      <td>${name}</td>
-                      <td>${price}</td>
-                      <td>${qoh}</td>
-                  </tr>`
-
-        $('#item_tbody').append(data);
-    });
-}
-
-// to generate item ids automatically
-function generateNextItemId() {
-    const nextItemId = 'I' + String(item_db.length + 1).padStart(3, '0');
-    $('#nextItemId').val(nextItemId);
-}
-
-// When Save a new item
-$('#item_save').on('click', function () {
-    let id = $('#nextItemId').val();
-    let name = $('#newItemName').val();
-    let price = $('#newItemPrice').val();
-    let qoh = $('#newItemQoh').val();
-
-    if (name === '' || price === '' || qoh === '') {
-        Swal.fire({
-            icon: "error",
-            title: "Error!",
-            text: "Please enter valid inputs..!"
-        });
-    } else {
-        let item_data = {
-            id: id,
-            name: name,
-            price: price,
-            qoh: qoh
-        };
-
-        item_db.push(item_data);
-        console.log(item_db);
-        syncAvailableItems();
-
-        loadItemsOnTable();
-
-        Swal.fire({
-            title: "Item Added successfully..!",
-            icon: "success",
-            draggable: true
-        });
-    }
-
-    $('#newItemName').val("");
-    $('#newItemPrice').val("");
-    $('#newItemQoh').val("");
-
-    generateNextItemId();
-});
-
-// to update item details
-$('#item_update').on('click', function () {
-    let id = $('#id').val();
-    let name = $('#item_name').val();
-    let price = $('#price').val();
-    let qoh = $('#qoh').val();
-
-
-    if (name === '' || price === '' || qoh === '') {
-        Swal.fire({
-            icon: "error",
-            title: "Error!",
-            text: "Please enter valid inputs..!"
-        });
-    } else if (selectedItemIndex !== -1) {
-
-        item_db[selectedItemIndex] = {
-            id: id,
-            name: name,
-            price: price,
-            qoh: qoh
-        };
-
-        loadItemsOnTable();
-
-        console.log(item_db);
-        syncAvailableItems();
-
-        Swal.fire({
-            title: "Item updated successfully..!",
-            icon: "success",
-            draggable: true
-        });
-
-        $('#id').val("");
-        $('#item_name').val("");
-        $('#price').val("");
-        $('#qoh').val("");
-
-        // Reset form and index
-        $('#item_form_fieldset').prop('disabled', true);
-        $('#item_reset').click();
-        selectedItemIndex = -1;
-
-    } else {
-        Swal.fire({
-            icon: "warning",
-            title: "No item selected!",
-            text: "Please select an item to update."
-        });
-    }
-});
-
-// Reset the form
-$('#item_reset').on('click', function () {
-    $('#id').val("");
-    $('#item_name').val("");
-    $('#price').val("");
-    $('#qoh').val("");
-});
-
-$('#item_delete').on('click', function () {
-    if (selectedItemIndex !== -1) {
-        // selected index and range (ensure only selected item deleting)
-        item_db.splice(selectedItemIndex, 1);
-        loadItemsOnTable();
-        syncAvailableItems();
-
-        Swal.fire({
-            title: "Deleted!",
-            text: "Item has been deleted successfully.",
-            icon: "success"
-        });
-
-        // reset form
-        $('#item_form_fieldset').prop('disabled', true);
-        $('#item_reset').click();
-        selectedItemIndex = -1;
-    }
-});
-
-
-// select an item by click on a table row
-$('#item_tbody').on('click', 'tr', function () {
-    //const index = $(this).index();
-    //const selectedItem = item_db[index];
-    selectedItemIndex = $(this).index();
-    const selectedItem = item_db[selectedItemIndex];
-
-    // to fill the form with selected customer's data
-    $('#id').val(selectedItem.id);
-    $('#item_name').val(selectedItem.name);
-    $('#price').val(selectedItem.price);
-    $('#qoh').val(selectedItem.qoh);
-
-    $('#item_form_fieldset').prop('disabled', false);
-});
-
-// to search items by a data
-$(document).ready(function () {
-
-    function filterItems() {
-        var value = $(this).val().toLowerCase();
-        $("#item_tbody tr").filter(function () {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-        });
-    }
-
-    // to filter items at live (while typing)
-    $("#search_item_input").on("keyup", filterItems);
-
-    // to filter items after click search btn
-    $('#search_item_btn').on('click', function (e) {
-        e.preventDefault();
-        filterItems();
-    });
-});
-
-
 //////////////////// Customer Related jQueries /////////////////////////////
+let customer_db = JSON.parse(localStorage.getItem('customer_db')) || [];
+let selectedCustomerIndex = -1;
 
-// To store customer details on an array / db
-let customer_db = [];
+// Initialize the page
+$(document).ready(function () {
+    generateNextCustomerId();
+    loadCustomersOnTable();
 
-generateNextCustomerId();
+    // Enable form when add button is clicked
+    $('[data-bs-target="#addCustomerModal"]').click(function () {
+        $('#customerForm')[0].reset();
+        generateNextCustomerId();
+    });
+});
 
-// to load stored customer details on the table
+// Load customers into the table
 function loadCustomersOnTable() {
-
     $('#customer_tbody').empty();
 
-    customer_db.map((item, index) => {
-        let name = item.name;
-        let phone = item.phone;
-        let address = item.address;
+    if (customer_db.length === 0) {
+        $('#customer_tbody').append('<tr><td colspan="6" class="text-center">No customers found</td></tr>');
+        return;
+    }
 
-        let data = `<tr>
-                      <td>${'C' + String(index + 1).padStart(3, '0')}</td>
-                      <td>${name}</td>
-                      <td>${phone}</td>
-                      <td>${address}</td>
-                  </tr>`
+    customer_db.forEach((customer, index) => {
+        let row = `<tr data-index="${index}">
+                      <td>${customer.id}</td>
+                      <td>${customer.name}</td>
+                      <td>${customer.phone}</td>
+                      <td>${customer.email || '-'}</td>
+                      <td>${customer.address || '-'}</td>
+                      <td>
+                          <button class="btn btn-sm btn-danger delete-customer-btn" data-index="${index}">
+                              <i class="bi bi-trash"></i>
+                          </button>
+                      </td>
+                  </tr>`;
+        $('#customer_tbody').append(row);
+    });
 
-        $('#customer_tbody').append(data);
+    // Add click event for delete buttons
+    $('.delete-customer-btn').on('click', function(e) {
+        e.stopPropagation(); // Prevent row selection when clicking delete
+        const index = $(this).data('index');
+        deleteCustomer(index);
     });
 }
 
-// to generate customer ids automatically
+// Generate the next customer ID
 function generateNextCustomerId() {
-    const nextId = 'C' + String(customer_db.length + 1).padStart(3, '0');
-    $('#nextId').val(nextId);
-}
-
-// When Save a new Customer
-$('#customer_save').on('click', function () {
-    let id = $('#nextId').val();
-    let name = $('#newName').val();
-    let phone = $('#newPhone').val();
-    let address = $('#newAddress').val();
-
-    // console.log(`fname: ${fname}, lname: ${lname}, address: ${address}`);
-
-    if (name === '' || phone === '' || address === '') {
-        Swal.fire({
-            icon: "error",
-            title: "Error!",
-            text: "Please enter valid inputs..!"
-        });
-    } else {
-        let customer_data = {
-            id: id,
-            name: name,
-            phone: phone,
-            address: address
-        };
-
-        customer_db.push(customer_data);
-        console.log(customer_db);
-
-        syncCustomers();
-        loadCustomersOnTable();
-
-
-        Swal.fire({
-            title: "Customer Added successfully..!",
-            icon: "success",
-            draggable: true
-        });
+    if (customer_db.length === 0) {
+        $('#customer_id').val('C001');
+        return;
     }
 
-    $('#newName').val("");
-    $('#newAddress').val("");
-    $('#newPhone').val("");
+    // Get the highest ID and increment
+    const maxId = Math.max(...customer_db.map(c =>
+        parseInt(c.id.substring(1))));
+    const nextId = 'C' + String(maxId + 1).padStart(3, '0');
+    $('#customer_id').val(nextId);
+}
 
-    generateNextCustomerId();
-});
-
-// to update customer details
-$('#customer_update').on('click', function () {
-    let id = $('#customer_id').val();
-    let name = $('#name').val();
-    let phone = $('#phone').val();
-    let address = $('#address').val();
-
-
-    if (name === '' || phone === '' || address === '') {
-        Swal.fire({
-            icon: "error",
-            title: "Error!",
-            text: "Please enter valid inputs..!"
-        });
-    } else if (selectedCustomerIndex !== -1) {
-
-        customer_db[selectedCustomerIndex] = {
-            id: id,
-            name: name,
-            phone: phone,
-            address: address
-        };
-
-        loadCustomersOnTable();
-        syncCustomers();
-
-        console.log(customer_db);
-
-        Swal.fire({
-            title: "Customer updated successfully..!",
-            icon: "success",
-            draggable: true
-        });
-
-        $('#customer_id').val("");
-        $('#name').val("");
-        $('#address').val("");
-        $('#phone').val("");
-
-        // Reset form and index
-        $('#customer_form_fieldset').prop('disabled', true);
-        $('#customer_reset').click();
-        selectedCustomerIndex = -1;
-
-    } else {
+// Delete customer function
+function deleteCustomer(index) {
+    if (index === -1 || index >= customer_db.length) {
         Swal.fire({
             icon: "warning",
-            title: "No customer selected!",
-            text: "Please select a customer to update."
+            title: "No Selection!",
+            text: "Please select a valid customer first"
         });
-    }
-});
-
-// Reset the form
-$('#customer_reset').on('click', function () {
-    $('#customer_id').val("");
-    $('#name').val("");
-    $('#address').val("");
-    $('#phone').val("");
-});
-
-$('#customer_delete').on('click', function () {
-    if (selectedCustomerIndex !== -1) {
-        // selected index and range (ensure only that customer deleting)
-        customer_db.splice(selectedCustomerIndex, 1);
-        loadCustomersOnTable();
-        syncCustomers();
-
-        Swal.fire({
-            title: "Deleted!",
-            text: "Customer has been deleted successfully.",
-            icon: "success"
-        });
-
-        // reset form
-        $('#customer_form_fieldset').prop('disabled', true);
-        $('#customer_reset').click();
-        selectedCustomerIndex = -1;
-    }
-});
-
-// select a customer by click on a table row
-$('#customer_tbody').on('click', 'tr', function () {
-    //const index = $(this).index();
-    //const selectedCustomer = customer_db[index];
-    selectedCustomerIndex = $(this).index();
-    const selectedCustomer = customer_db[selectedCustomerIndex];
-
-    // to fill the form with selected customer's data
-    $('#customer_id').val(selectedCustomer.id);
-    $('#name').val(selectedCustomer.name);
-    $('#phone').val(selectedCustomer.phone);
-    $('#address').val(selectedCustomer.address);
-
-    $('#customer_form_fieldset').prop('disabled', false);
-});
-
-// to search customer by a data
-$(document).ready(function () {
-    function filterCustomers() {
-        var value = $(this).val().toLowerCase();
-        $("#customer_tbody tr").filter(function () {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-        });
+        return;
     }
 
-    // to filter customer at live (while typing)
-    $("#search_input").on("keyup", filterCustomers);
+    const customer = customer_db[index];
 
-    // to filter customer after click search btn
-    $('#search_btn').on('click', function (e) {
-        e.preventDefault();
-        filterCustomers();
-    });
-});
+    Swal.fire({
+        title: "Are you sure?",
+        html: `You are about to delete <strong>${customer.name}</strong> (${customer.id})`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            customer_db.splice(index, 1);
+            syncCustomers();
+            loadCustomersOnTable();
+            resetCustomerForm();
 
-
-//////////////////// Order Related jQueries /////////////////////////////
-
-// Sample items array (can be fetched from backend too)
-let available_items = [];
-let orders_db = [];
-
-$(document).ready(function () {
-    $("#search_order_item_input").prop("disabled", true);
-    $("#search_order_item_btn").prop("disabled", true);
-    $("#search_customer_input").prop("disabled", true);
-    $("#search_customer_btn").prop("disabled", true);
-    $("#finalize-order-place-btn").prop("disabled", true);
-    $("#order-available-item-card").css("pointer-events", "none").css("opacity", "0.6");
-    $("#order-items-card").css("pointer-events", "none").css("opacity", "0.6");
-
-    /*available_items = [
-        {name: "Toffee", price: 15.00, qoh: 20},
-        {name: "Cake", price: 1200.00, qoh: 5},
-        {name: "Chocolate", price: 160.00, qoh: 50},
-        {name: "Lollipop", price: 10.00, qoh: 100},
-        {name: "Biscuit", price: 100.00, qoh: 40},
-        {name: "Marshmallows", price: 150.00, qoh: 80}
-    ];*/
-    //renderItems();
-});
-
-function syncAvailableItems() {
-    available_items = item_db
-        .filter(item => item.qoh > 0) // 🔄 Exclude items with QoH <= 0
-        .map(item => ({
-            name: item.name,
-            price: parseFloat(item.price),
-            qoh: parseInt(item.qoh)
-        }));
-    renderItems();
-}
-
-function renderItems(filter = "") {
-    const container = $("#order_item_tbody");
-    container.empty();
-
-    $.each(available_items.filter(item => item.name.toLowerCase().includes(filter.toLowerCase())), function (index, item) {
-        const card = `
-                    <div class="col-6 col-md-6 mb-3">
-                        <div class="card h-100 bg-light text-dark shadow-sm">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="text-start">
-                                    <h6 class="card-title mb-1">${item.name}</h6>
-                                    <p class="card-text mb-2">Rs. ${item.price.toFixed(2)}</p>
-                                </div>
-                                <div class="text-end mt-auto">
-                                    <button class="btn btn-dark btn-sm add_to_cart_btn" data-index="${index}">
-                                        <i class="ti ti-shopping-cart"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-        container.append(card);
+            Swal.fire(
+                "Deleted!",
+                "Customer has been deleted.",
+                "success"
+            );
+        }
     });
 }
 
-//renderItems();
+// Save customer to the database
+$('#customer_save').on('click', function () {
+    let id = $('#customer_id').val();
+    let name = $('#customerName').val().trim();
+    let phone = $('#customerPhone').val().trim();
+    let email = $('#customerEmail').val().trim();
+    let address = $('#customerAddress').val().trim();
 
-// Search filter (live typing)
-$("#search_order_item_input").on("keyup", function () {
-    renderItems($(this).val());
-});
-
-// Search button
-$("#search_order_item_btn").on("click", function (e) {
-    e.preventDefault();
-    renderItems($("#search_order_item_input").val());
-});
-
-
-// get Customer list
-/*const customerList = [
-    {id: "C001", name: "John"},
-    {id: "C002", name: "Mary"},
-    {id: "C003", name: "Nimal"},
-    {id: "C004", name: "Jeeva"},
-    {id: "C005", name: "Priya"},
-    {id: "C006", name: "Akshay"}
-];*/
-let customerList = [];
-const datalist_customers = $("#customerDatalistOptions");
-
-function syncCustomers() {
-    customerList = customer_db;
-    $.each(customerList, function (index, customer) {
-        let customerOption = `<option value="${customer.name}">`;
-        datalist_customers.append(customerOption);
-    });
-}
-
-$(document).ready(function () {
-    syncCustomers();
-});
-
-// add items to cart
-$(document).on("click", ".add_to_cart_btn", function () {
-    const index = $(this).data("index");
-    const item = available_items[index];
-    let count = 1;
-    let itemTotalAmount = item.price * count;
-    const cartCard = `
-                    <div class="col-12 col-md-12 mb-3">
-                        <div class="card h-100 bg-light text-dark shadow-sm">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div class="text-start">
-                                    <h6 class="card-title mb-1">${item.name} x <span class="item-cart-count-display">${count}</span></h6>
-                                    <p class="card-text mb-2 item-total">Rs. ${item.price.toFixed(2)} x <span class="item-cart-count-display">${count}</span> = <span class="item-total-amount">${itemTotalAmount.toFixed(2)}</span></p>
-                                    <button class="btn btn-outline-dark rounded-circle btn-dark text-white btn-sm me-1 increaseCount" style="width: 20px; height: 20px; padding: 0;"><i class="ti ti-plus"></i></button><span class="item-cart-count">${count}</span>
-                                    <button class="btn btn-outline-dark rounded-circle btn-dark text-white btn-sm me-1 decreaseCount" style="width: 20px; height: 20px; padding: 0;"><i class="ti ti-minus"></i></button>
-                                </div>
-                                <div class="text-end mt-auto">
-                                    <button class="btn btn-dark btn-sm remove_from_cart_btn"><i class="ti ti-trash"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-    $("#item_cart").append(cartCard);
-});
-
-$(document).on('click', ".increaseCount", function () {
-    const cardBody = $(this).closest(".card-body");
-    const countDisplay = cardBody.find(".item-cart-count-display");
-    const countSpans = cardBody.find(".item-cart-count");
-    const totalItemAmountText = cardBody.find(".item-total-amount");
-    const item = cardBody.find(".card-title").text().split(" x ")[0].trim();
-    const price = available_items.find(i => i.name === item).price;
-    const itemData = available_items.find(i => i.name === item);
-
-    let count = parseInt($(countSpans[0]).text());
-    count++;
-
-    // Check quantity limit
-    if (count > itemData.qoh) {
-        alert(`Only ${itemData.qoh} ${item}(s) available.`);
-        return;
-    }
-
-    countSpans.text(count);
-    countDisplay.text(count);
-
-    totalItemAmountText.text((price * count).toFixed(2));
-});
-
-$(document).on('click', ".decreaseCount", function () {
-    const cardBody = $(this).closest(".card-body");
-    const countDisplay = cardBody.find(".item-cart-count-display");
-    const countSpans = cardBody.find(".item-cart-count");
-    const totalItemAmountText = cardBody.find(".item-total-amount");
-    const item = cardBody.find(".card-title").text().split(" x ")[0].trim();
-    const price = available_items.find(i => i.name === item).price;
-    //const itemData = items.find(i => i.name === item);
-
-    let count = parseInt($(countSpans[0]).text());
-    count--;
-
-    // Check quantity limit
-    if (count < 1) {
-        return;
-    }
-
-    countSpans.text(count);
-    countDisplay.text(count);
-
-    totalItemAmountText.text((price * count).toFixed(2));
-    syncAvailableItems();
-});
-
-$(document).on("click", ".remove_from_cart_btn", function () {
-    $(this).closest(".col-12").remove();
-});
-
-$(document).on("click", "#finalize-order-place-btn", function (e) {
-    e.preventDefault();
-
-    const customerName = $("#search_customer_input").val().trim();
-    const customer = customerList.find(c => c.name === customerName);
-
-    //if (!customerName || !customerList.includes(customerName)) {
-    if (!customer) {
+    // Validation
+    if (!name || !phone) {
         Swal.fire({
-            icon: 'error',
-            title: 'Customer not selected!',
-            text: 'Please select a valid customer before placing the order.',
+            icon: "error",
+            title: "Error!",
+            text: "Please fill all required fields!"
         });
         return;
     }
 
-    const cartItems = $("#item_cart").children(".col-12, .col-md-12");
-
-    if (cartItems.length === 0) {
+    // Phone number validation
+    if (!/^0[1-9][0-9]{8}$/.test(phone)) {
         Swal.fire({
-            icon: 'warning',
-            title: 'Cart is empty!',
-            text: 'Please add items before placing the order.',
+            icon: "error",
+            title: "Invalid Phone!",
+            text: "Please enter a valid Sri Lankan phone number (10 digits starting with 0)"
         });
         return;
     }
 
-    // to get order details
-    const orderId = $("#next_order_id").val();
-    const orderedItems = [];
+    // Email validation
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        Swal.fire({
+            icon: "error",
+            title: "Invalid Email!",
+            text: "Please enter a valid email address"
+        });
+        return;
+    }
 
-    cartItems.each(function () {
-        const itemName = $(this).find(".card-title").text().split(" x ")[0].trim();
-        const itemQuantity = parseInt($(this).find(".item-cart-count").text().trim());
-        const itemPrice = Number(available_items.find(i => i.name === itemName).price);
-
-        const item = {name: itemName, quantity: itemQuantity, price: itemPrice};
-        orderedItems.push(item);
-        console.log("Item:", item.name, "Price:", item.price, "Quantity:", item.quantity);
-        console.log("Raw quantity text:", $(this).find(".item-cart-count").text());
-
-    });
-
-    const order = {
-        orderId: orderId,
-        customer: customerName,
-        available_items: orderedItems
+    let customer_data = {
+        id: id,
+        name: name,
+        phone: phone,
+        email: email || null,
+        address: address || null
     };
 
-    orders_db.push(order);
-
-    const totalAmount = orderedItems.reduce((total, item) => total + (Number(item.price) * Number(item.quantity)), 0);
-    console.log("Item Prices:", orderedItems.map(item => item.price));
-    console.log("Calculated Total:", totalAmount);
-
-    const invoice = {
-        invoiceId: invoices.length + 1 ,
-        orderId: orderId,
-        customerName: customerName,
-        items: orderedItems,
-        totalAmount: Number(totalAmount.toFixed(2))
+    // Check if we're updating an existing customer
+    if (selectedCustomerIndex !== -1) {
+        customer_db[selectedCustomerIndex] = customer_data;
+    } else {
+        customer_db.push(customer_data);
     }
 
-    invoices.push(invoice);
-    console.log("Invoices Data:", invoices);
-    updateInvoiceTable();
+    syncCustomers();
+    loadCustomersOnTable();
 
-    // If cart is not empty
     Swal.fire({
-        icon: 'success',
-        title: 'Order placed!',
-        text: 'Your order has been successfully submitted.',
-        confirmButtonText: 'OK'
+        title: "Success!",
+        text: `Customer ${selectedCustomerIndex !== -1 ? 'updated' : 'added'} successfully`,
+        icon: "success"
     }).then(() => {
-        const order = {
-            orderId: $('#next_order_id').val(),
-            customer: customer.id,
-            available_items: []
-        };
-
-        orderedItems.forEach(item => {
-            const inventoryItem = item_db.find(i => i.name === item.name);
-            if (inventoryItem) {
-                if (inventoryItem.qoh - item.quantity < 0) {
-                    console.error(`Insufficient stock for ${item.name}.`);
-                    return; // Prevent QoH from going negative
-                }
-
-                inventoryItem.qoh -= item.quantity; // Reduce stock
-                console.log(`Updated QoH for ${item.name}:`, inventoryItem.qoh);
-
-                // Ensure item_db updates correctly
-                const itemIndex = item_db.findIndex(i => i.name === item.name);
-                if (itemIndex !== -1) {
-                    item_db[itemIndex].qoh = inventoryItem.qoh;
-                }
-            }
-        });
-        console.log(item_db);
-        console.log(available_items);
-        syncAvailableItems();
-        loadItemsOnTable();
-
-        console.log("updated item db: "+item_db);
-        console.log("updated available items: "+available_items);
-
-        $("#item_cart").empty();
-
-        generateNextOrderId();
-        $("#search_customer_input").val("");
-        /*$("#search_item_input").prop("disabled", true);
-        $("#search_item_btn").prop("disabled", true);
-        $("#search_customer_input").prop("disabled", true);
-        $("#search_customer_btn").prop("disabled", true);
-        $("#finalize-order-place-btn").prop("disabled", true);
-        $(".card-body").css("pointer-events", "none").css("opacity", "0.6");*/
-
+        $('#addCustomerModal').modal('hide');
+        resetCustomerForm();
     });
 });
 
-$(document).on("click", "#new_order_btn", function () {
-    $("#search_order_item_input").prop("disabled", false);
-    $("#search_order_item_btn").prop("disabled", false);
-    $("#search_customer_input").prop("disabled", false);
-    $("#search_customer_btn").prop("disabled", false);
-    $("#finalize-order-place-btn").prop("disabled", false);
-    $("#order-available-item-card").css("pointer-events", "auto").css("opacity", "1");
-    $("#order-items-card").css("pointer-events", "auto").css("opacity", "1");
+// Select a customer from the table
+$('#customer_tbody').on('click', 'tr', function (e) {
+    if ($(e.target).hasClass('delete-customer-btn') || $(e.target).parents('.delete-customer-btn').length) {
+        return;
+    }
 
-    generateNextOrderId();
+    selectedCustomerIndex = $(this).data('index');
+    const customer = customer_db[selectedCustomerIndex];
+
+    $('#customer_id').val(customer.id);
+    $('#customerName').val(customer.name);
+    $('#customerPhone').val(customer.phone);
+    $('#customerEmail').val(customer.email || '');
+    $('#customerAddress').val(customer.address || '');
+
+    $('#addCustomerModal').modal('show');
 });
 
-function generateNextOrderId() {
-    const nextOrderId = 'OR' + String(orders_db.length + 1).padStart(3, '0');
-    $('#next_order_id').val(nextOrderId);
+// Search functionality
+$('.input-group input').on('keyup', function () {
+    const searchTerm = $(this).val().toLowerCase();
+
+    $('#customer_tbody tr').each(function () {
+        const rowText = $(this).text().toLowerCase();
+        $(this).toggle(rowText.includes(searchTerm));
+    });
+});
+
+// Sync with localStorage
+function syncCustomers() {
+    localStorage.setItem('customer_db', JSON.stringify(customer_db));
+    generateNextCustomerId();
 }
 
-//////////////////// Invoice / Order history Related jQueries /////////////////////////////
+// Reset the form
+function resetCustomerForm() {
+    $('#customerForm')[0].reset();
+    selectedCustomerIndex = -1;
+    generateNextCustomerId();
+}
 
-    let invoices = [];
+// Close modal handler
+$('#addCustomerModal').on('hidden.bs.modal', function () {
+    resetCustomerForm();
+});
 
-    function updateInvoiceTable() {
-        $("#invoice_tbody").empty(); // Clear previous data
+////////////////////// Product Related jQueries /////////////////////////////
+let product_db = JSON.parse(localStorage.getItem('product_db')) || [];
+let selectedProductIndex = -1;
 
-        if (invoices.length === 0) {
-            alert("No Invoices Available..!");
+// Initialize the page
+$(document).ready(function () {
+    generateNextProductId();
+    loadProductsOnTable();
+
+    // Enable form when add button is clicked
+    $('[data-bs-target="#addProductModal"]').click(function () {
+        $('#addProductModal form')[0].reset();
+        generateNextProductId();
+    });
+});
+
+// Load products into the table
+function loadProductsOnTable() {
+    $('#store_tbody').empty();
+
+    if (product_db.length === 0) {
+        $('#store_tbody').append('<tr><td colspan="8" class="text-center">No products found</td></tr>');
+        return;
+    }
+
+    product_db.forEach((product, index) => {
+        let row = `<tr data-index="${index}">
+                      <td>${product.id}</td>
+                      <td>${product.name}</td>
+                      <td>${product.category}</td>
+                      <td>$${product.price.toFixed(2)}</td>
+                      <td>${product.quantity}</td>
+                      <td>${product.barcode || '-'}</td>
+                      <td>${product.description || '-'}</td>
+                      <td>
+                          <button class="btn btn-sm btn-danger delete-product-btn" data-index="${index}">
+                              <i class="bi bi-trash"></i>
+                          </button>
+                      </td>
+                  </tr>`;
+        $('#store_tbody').append(row);
+    });
+
+    // Add click event for delete buttons
+    $('.delete-product-btn').on('click', function(e) {
+        e.stopPropagation(); // Prevent row selection when clicking delete
+        const index = $(this).data('index');
+        deleteProduct(index);
+    });
+}
+
+// Generate the next product ID
+function generateNextProductId() {
+    if (product_db.length === 0) {
+        $('#id').val('P001');
+        return;
+    }
+
+    // Get the highest ID and increment
+    const maxId = Math.max(...product_db.map(p =>
+        parseInt(p.id.substring(1))));
+    const nextId = 'P' + String(maxId + 1).padStart(3, '0');
+    $('#id').val(nextId);
+}
+
+// Delete product function
+function deleteProduct(index) {
+    if (index === -1 || index >= product_db.length) {
+        Swal.fire({
+            icon: "warning",
+            title: "No Selection!",
+            text: "Please select a valid product first"
+        });
+        return;
+    }
+
+    const product = product_db[index];
+
+    Swal.fire({
+        title: "Are you sure?",
+        html: `You are about to delete <strong>${product.name}</strong> (${product.id})`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            product_db.splice(index, 1);
+            syncProducts();
+            loadProductsOnTable();
+            resetProductForm();
+
+            Swal.fire(
+                "Deleted!",
+                "Product has been deleted.",
+                "success"
+            );
+        }
+    });
+}
+
+// Save product to the database
+$('#addProductModal .btn-primary').on('click', function () {
+    let id = $('#id').val();
+    let name = $('#productName').val().trim();
+    let category = $('#productCategory').val();
+    let price = parseFloat($('#productPrice').val());
+    let quantity = parseInt($('#productQuantity').val());
+    let barcode = $('#productBarcode').val().trim();
+    let description = $('#productDescription').val().trim();
+
+    // Validation
+    if (!name || !category || isNaN(price) || isNaN(quantity)) {
+        Swal.fire({
+            icon: "error",
+            title: "Error!",
+            text: "Please fill all required fields with valid data!"
+        });
+        return;
+    }
+
+    if (price <= 0) {
+        Swal.fire({
+            icon: "error",
+            title: "Invalid Price!",
+            text: "Price must be greater than 0"
+        });
+        return;
+    }
+
+    if (quantity < 0) {
+        Swal.fire({
+            icon: "error",
+            title: "Invalid Quantity!",
+            text: "Quantity cannot be negative"
+        });
+        return;
+    }
+
+    let product_data = {
+        id: id,
+        name: name,
+        category: category,
+        price: price,
+        quantity: quantity,
+        barcode: barcode || null,
+        description: description || null
+    };
+
+    // Check if we're updating an existing product
+    if (selectedProductIndex !== -1) {
+        product_db[selectedProductIndex] = product_data;
+    } else {
+        product_db.push(product_data);
+    }
+
+    syncProducts();
+    loadProductsOnTable();
+
+    Swal.fire({
+        title: "Success!",
+        text: `Product ${selectedProductIndex !== -1 ? 'updated' : 'added'} successfully`,
+        icon: "success"
+    }).then(() => {
+        $('#addProductModal').modal('hide');
+        resetProductForm();
+    });
+});
+
+// Select a product from the table
+$('#store_tbody').on('click', 'tr', function () {
+    // Don't trigger if delete button was clicked
+    if ($(event.target).hasClass('delete-product-btn') || $(event.target).parents('.delete-product-btn').length) {
+        return;
+    }
+
+    selectedProductIndex = $(this).data('index');
+    const product = product_db[selectedProductIndex];
+
+    $('#id').val(product.id);
+    $('#productName').val(product.name);
+    $('#productCategory').val(product.category);
+    $('#productPrice').val(product.price);
+    $('#productQuantity').val(product.quantity);
+    $('#productBarcode').val(product.barcode || '');
+    $('#productDescription').val(product.description || '');
+
+    $('#addProductModal').modal('show');
+});
+
+// Search functionality
+$('.input-group input').on('keyup', function () {
+    const searchTerm = $(this).val().toLowerCase();
+
+    $('#store_tbody tr').each(function () {
+        const rowText = $(this).text().toLowerCase();
+        $(this).toggle(rowText.includes(searchTerm));
+    });
+});
+
+// Sync with localStorage
+function syncProducts() {
+    localStorage.setItem('product_db', JSON.stringify(product_db));
+    generateNextProductId();
+}
+
+// Reset the form
+function resetProductForm() {
+    $('#addProductModal form')[0].reset();
+    selectedProductIndex = -1;
+    generateNextProductId();
+}
+
+// Close modal handler
+$('#addProductModal').on('hidden.bs.modal', function () {
+    resetProductForm();
+});
+
+////////////////////// Order Management /////////////////////////////
+let order_db = JSON.parse(localStorage.getItem('order_db')) || [];
+let selectedOrderIndex = -1;
+let currentOrderItems = [];
+
+// Initialize the page
+$(document).ready(function () {
+    loadOrdersOnTable();
+    populateCustomerDropdown();
+    populateProductDropdown();
+
+    // Set current date as default
+    $('#orderDate').val(new Date().toISOString().split('T')[0]);
+
+    // Add product to order
+    $('#addProductBtn').on('click', function() {
+        addProductToOrder();
+    });
+
+    // Place order button
+    $('#order-place-btn').on('click', function() {
+        placeOrder();
+    });
+
+    // New order button
+    $('#new_order_btn').on('click', function() {
+        generateNextOrderId();
+        currentOrderItems = [];
+        updateOrderItemsTable();
+        $('#orderDate').val(new Date().toISOString().split('T')[0]);
+        $('#orderNotes').val('');
+    });
+
+    // Search orders
+    $('#search_order_btn').on('click', function() {
+        filterOrders($('#search_orders').val());
+    });
+
+    $('#search_orders').on('keyup', function() {
+        filterOrders($(this).val());
+    });
+});
+
+// Generate next order ID
+function generateNextOrderId() {
+    if (order_db.length === 0) {
+        $('#orderId').val('O001');
+        return;
+    }
+
+    const maxId = Math.max(...order_db.map(o =>
+        parseInt(o.id.substring(1))));
+    const nextId = 'O' + String(maxId + 1).padStart(3, '0');
+    $('#orderId').val(nextId);
+}
+
+// Populate customer dropdown
+function populateCustomerDropdown() {
+    const dropdown = $('#orderCustomer');
+    dropdown.empty();
+    dropdown.append('<option value="">Select Customer</option>');
+
+    customer_db.forEach(customer => {
+        dropdown.append(`<option value="${customer.id}">${customer.name}</option>`);
+    });
+}
+
+// Populate product dropdown
+function populateProductDropdown() {
+    const dropdown = $('#orderProductSelect');
+    dropdown.empty();
+    dropdown.append('<option value="">Select Product</option>');
+
+    product_db.forEach(product => {
+        if (product.quantity > 0) {
+            dropdown.append(`<option value="${product.id}" data-price="${product.price}">${product.name}</option>`);
+        }
+    });
+}
+
+// Add product to order items
+function addProductToOrder() {
+    const productId = $('#orderProductSelect').val();
+    const quantity = parseInt($('#orderProductQty').val());
+
+    if (!productId || isNaN(quantity) || quantity <= 0) {
+        showAlert('Error!', 'Please select a product and enter a valid quantity!', 'error');
+        return;
+    }
+
+    const product = product_db.find(p => p.id === productId);
+    if (!product) {
+        showAlert('Error!', 'Selected product not found!', 'error');
+        return;
+    }
+
+    if (quantity > product.quantity) {
+        showAlert('Insufficient Stock!', `Only ${product.quantity} items available in stock!`, 'error');
+        return;
+    }
+
+    // Check if product already exists in order
+    const existingItemIndex = currentOrderItems.findIndex(item => item.id === productId);
+    if (existingItemIndex !== -1) {
+        // Update quantity if already exists
+        const newQty = currentOrderItems[existingItemIndex].quantity + quantity;
+        if (newQty > product.quantity) {
+            showAlert('Insufficient Stock!', `Cannot add more than available stock (${product.quantity})!`, 'error');
             return;
         }
-
-        let orderDate = new Date().toLocaleDateString('en-LK');
-
-
-        invoices.forEach(invoice => {
-            const row = `
-                    <tr>
-                        <th scope="row">${invoice.invoiceId}</th>
-                        <td>${invoice.orderId}</td>
-                        <td>${invoice.customerName}</td>
-                        <td>${orderDate}</td>
-                        <td>${invoice.totalAmount.toFixed(2)}</td>
-                        <td>
-                            <button class="btn btn-light text-dark btn-sm print_invoice_btn" data-id="${invoice.orderId}" style="width: 30px; height: 30px; padding: 0; font-size: 20px">
-                                <i class="ti ti-printer"></i>
-                            </button>
-                        </td>
-                    </tr>
-                 `;
-            $("#invoice_tbody").append(row);
+        currentOrderItems[existingItemIndex].quantity = newQty;
+    } else {
+        // Add new item
+        currentOrderItems.push({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: quantity
         });
     }
 
-    $(document).on("click", ".print_invoice_btn", function () {
-    const receiptId = $(this).data("id");
+    updateOrderItemsTable();
+    $('#orderProductQty').val(1);
+}
 
-        // Find the invoice details
-        const invoice = invoices.find(inv => inv.orderId === receiptId);
-        if (!invoice) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Invoice not found!',
-                text: 'Something went wrong, please try again.',
-            });
-            return;
-        }
+// Update the order items table
+function updateOrderItemsTable() {
+    const tableBody = $('#orderItemsTable');
+    tableBody.empty();
 
-        const items = invoice.items;
-        const date = invoice.date || new Date().toLocaleDateString('en-LK');
-        const time = new Date().toLocaleTimeString('en-LK', {hour: '2-digit', minute: '2-digit'});
-        const subTotal = items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-        const tax = 0;
-        const total = subTotal + tax;
+    if (currentOrderItems.length === 0) {
+        tableBody.append('<tr><td colspan="5" class="text-center">No items added</td></tr>');
+        $('#orderTotalAmount').text('$0.00');
+        return;
+    }
 
-        populateInvoice(items, receiptId, date, time, subTotal, tax, total);
+    currentOrderItems.forEach((item, index) => {
+        const row = `<tr>
+            <td>${item.name}</td>
+            <td>$${item.price.toFixed(2)}</td>
+            <td>${item.quantity}</td>
+            <td>$${(item.price * item.quantity).toFixed(2)}</td>
+            <td><button class="btn btn-sm btn-danger remove-item-btn" data-index="${index}"><i class="bi bi-trash"></i></button></td>
+        </tr>`;
+        tableBody.append(row);
     });
 
-    function populateInvoice(items, receiptId, date, time, subTotal, tax, total) {
-        const modalHtml = `
-                    <div class="modal fade" id="invoiceModal" tabindex="-1" aria-labelledby="invoiceModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
-                            <div class="modal-content">
-                                <div class="modal-header bg-dark text-white">
-                                <h5 class="modal-title" id="invoiceModalLabel"><i class="ti ti-receipt"></i> RECEIPT</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="container-fluid">
-                                    <div class="text-center mb-3">
-                                        <h6 class="mb-0">Bite Of Bliss</h6>
-                                        <p class="mb-0 small">31/5z, Main Street, Kalutara South</p>
-                                        <p class="mb-0 small">Email: bob@gmail.com</p>
-                                        <p class="small">Phone: +94712345678</p>
-                                    </div>
-                                    <hr class="my-2">
-                                    <div class="row mb-2">
-                                        <div class="col-8">Reciept Id: ${receiptId}</div>
-                                        <div class="col-4 text-end">Invoice No: ${invoices.length}</div>
-                                        <div class="col-8">Date: ${date}</div>
-                                        <div class="col-4 text-end">Time: ${time}</div>
-                                    </div>
-                                    <hr class="my-2">
-                                    <div id="invoice-items">
-                                        ${items.map(item => `
-                                            <div class="row">
-                                                <div class="col-7">${item.name}${item.quantity ? ' x ' + item.quantity : ''}</div>
-                                                <div class="col-5 text-end">Rs. ${(item.price * (item.quantity || 1)).toFixed(2)}</div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                    <hr class="my-2">
-                                    <div class="row">
-                                        <div class="col-7">Sub Total</div>
-                                        <div class="col-5 text-end">Rs. ${subTotal.toFixed(2)}</div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-7">+ Tax</div>
-                                        <div class="col-5 text-end">Rs. ${tax.toFixed(2)}</div>
-                                    </div>
-                                    <hr class="my-2">
-                                    <div class="row">
-                                        <div class="col-7"><strong>Total</strong></div>
-                                        <div class="col-5 text-end"><strong>Rs. ${total.toFixed(2)}</strong></div>
-                                    </div>
-                                    <hr class="my-3">
-                                    <div class="text-center">
-                                        <p class="small">Thank You For Visiting!</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="button" class="btn btn-dark">Print</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
+    // Calculate and update total
+    const total = currentOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    $('#orderTotalAmount').text(`$${total.toFixed(2)}`);
 
-    $("#invoiceModal").remove();
+    // Add event listeners to remove buttons
+    $('.remove-item-btn').on('click', function() {
+        const index = $(this).data('index');
+        currentOrderItems.splice(index, 1);
+        updateOrderItemsTable();
+    });
+}
 
-    $("body").append(modalHtml);
+// Place the order
+function placeOrder() {
+    const customerId = $('#orderCustomer').val();
+    const orderDate = $('#orderDate').val();
+    const notes = $('#orderNotes').val();
 
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById("invoiceModal"));
-    modal.show();
-};
+    if (!customerId) {
+        showAlert('Error!', 'Please select a customer!', 'error');
+        return;
+    }
 
-$(document).ready(function() {
-    $("#item-content").hide();
-    $("#customer-content").hide();
-    $("#orders-content").hide();
+    if (currentOrderItems.length === 0) {
+        showAlert('Warning!', 'Please add at least one product to the order!', 'warning');
+        return;
+    }
+
+    const customer = customer_db.find(c => c.id === customerId);
+    if (!customer) {
+        showAlert('Error!', 'Selected customer not found!', 'error');
+        return;
+    }
+
+    // Create order object
+    const order = {
+        id: $('#orderId').val(),
+        customerId: customerId,
+        customerName: customer.name,
+        date: orderDate,
+        items: currentOrderItems,
+        notes: notes || null,
+        status: 'completed'
+    };
+
+    // Update product quantities in inventory
+    currentOrderItems.forEach(orderItem => {
+        const product = product_db.find(p => p.id === orderItem.id);
+        if (product) {
+            product.quantity -= orderItem.quantity;
+            if (product.quantity < 0) product.quantity = 0;
+        }
+    });
+
+    // Save changes
+    order_db.push(order);
+    localStorage.setItem('order_db', JSON.stringify(order_db));
+    localStorage.setItem('product_db', JSON.stringify(product_db));
+
+    showAlert('Success!', `Order #${order.id} placed successfully!`, 'success').then(() => {
+        $('#createOrderModal').modal('hide');
+        loadOrdersOnTable();
+        populateProductDropdown(); // Refresh product dropdown with updated quantities
+    });
+}
+
+// Load orders into the table
+function loadOrdersOnTable() {
+    $('#order_tbody').empty();
+
+    if (order_db.length === 0) {
+        $('#order_tbody').append('<tr><td colspan="6" class="text-center">No orders found</td></tr>');
+        return;
+    }
+
+    order_db.forEach((order, index) => {
+        const orderDate = order.date ?
+            (order.date instanceof Date ?
+                order.date.toLocaleDateString() :
+                new Date(order.date).toLocaleDateString()) :
+            '-';
+
+        const totalItems = order.items ?
+            order.items.reduce((sum, item) => sum + (item.quantity || 0), 0) :
+            0;
+
+        const totalPrice = order.items ?
+            order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0) :
+            0;
+
+        let row = `<tr data-index="${index}">
+            <td>${order.id || '-'}</td>
+            <td>${order.customerName || order.customer || '-'}</td>
+            <td>${orderDate}</td>
+            <td>${totalItems}</td>
+            <td>$${totalPrice.toFixed(2)}</td>
+            <td>
+                <button class="btn btn-sm btn-info view-order-btn" data-index="${index}">
+                    <i class="bi bi-eye"></i> Invoice
+                </button>
+            </td>
+        </tr>`;
+        $('#order_tbody').append(row);
+    });
+
+    // Add event listeners to view buttons
+    $('.view-order-btn').on('click', function() {
+        const index = $(this).data('index');
+        viewOrderDetails(index);
+    });
+}
+
+// View order details
+function viewOrderDetails(index) {
+    const order = order_db[index];
+    if (!order) return;
+
+    const orderDate = order.date ?
+        (order.date instanceof Date ?
+            order.date.toLocaleDateString() :
+            new Date(order.date).toLocaleDateString()) :
+        '-';
+
+    const customer = customer_db.find(c => c.id === order.customerId);
+    const customerInfo = customer ?
+        `${customer.name}<br>${customer.phone}<br>${customer.email || ''}` :
+        'Customer not found';
+
+    let itemsHtml = '';
+    order.items.forEach(item => {
+        itemsHtml += `<tr>
+            <td>${item.name}</td>
+            <td>$${item.price.toFixed(2)}</td>
+            <td>${item.quantity}</td>
+            <td>$${(item.price * item.quantity).toFixed(2)}</td>
+        </tr>`;
+    });
+
+    const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    Swal.fire({
+        title: `Order #${order.id}`,
+        html: `
+            <div class="text-start">
+                <p><strong>Date:</strong> ${orderDate}</p>
+                <p><strong>Customer:</strong><br>${customerInfo}</p>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="3">Total</th>
+                                <th>$${totalPrice.toFixed(2)}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                ${order.notes ? `<p><strong>Notes:</strong> ${order.notes}</p>` : ''}
+            </div>
+        `,
+        width: '800px',
+        confirmButtonText: 'Close'
+    });
+}
+
+// Filter orders
+function filterOrders(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    $('#order_tbody tr').each(function() {
+        const rowText = $(this).text().toLowerCase();
+        $(this).toggle(rowText.includes(term));
+    });
+}
+
+// Helper function to show alerts
+function showAlert(title, text, icon) {
+    return Swal.fire({
+        title: title,
+        text: text,
+        icon: icon,
+        confirmButtonText: 'OK'
+    });
+}
+
+//////////////////////////////////////////////////////////////////////
+$(document).ready(function () {
+    $("#store_content").hide();
+    $("#customer_content").hide();
+    $("#order_content").hide();
     $("#invoice-content").hide();
 });
 
-$("#home-manage-btn").on("click", function () {
-    $("#dashboard-content").css("display", "block");
-    $("#item-content").css("display", "none");
-    $("#customer-content").css("display", "none");
-    $("#orders-content").css("display", "none");
+$("#dash-btn").on("click", function () {
+    $("#dashboard_content").css("display", "block");
+    $("#store_content").css("display", "none");
+    $("#customer_content").css("display", "none");
+    $("#order_content").css("display", "none");
     $("#invoice-content").css("display", "none");
 });
 
-$("#item-manage-btn").on("click", function () {
-    $("#item-content").css("display", "block");
-    $("#dashboard-content").css("display", "none");
-    $("#customer-content").css("display", "none");
-    $("#orders-content").css("display", "none");
+$("#store-btn").on("click", function () {
+    $("#store_content").css("display", "block");
+    $("#dashboard_content").css("display", "none");
+    $("#customer_content").css("display", "none");
+    $("#order_content").css("display", "none");
     $("#invoice-content").css("display", "none");
 });
 
-$("#customer-manage-btn").on("click", function () {
-    $("#customer-content").css("display", "block");
-    $("#item-content").css("display", "none");
-    $("#dashboard-content").css("display", "none");
-    $("#orders-content").css("display", "none");
+$("#customer-btn").on("click", function () {
+    $("#customer_content").css("display", "block");
+    $("#store_content").css("display", "none");
+    $("#dashboard_content").css("display", "none");
+    $("#order_content").css("display", "none");
     $("#invoice-content").css("display", "none");
 });
 
-$("#order-manage-btn").on("click", function () {
-    $("#orders-content").css("display", "block");
-    $("#item-content").css("display", "none");
-    $("#customer-content").css("display", "none");
-    $("#dashboard-content").css("display", "none");
+$("#order-btn").on("click", function () {
+    $("#order_content").css("display", "block");
+    $("#store_content").css("display", "none");
+    $("#customer_content").css("display", "none");
+    $("#dashboard_content").css("display", "none");
     $("#invoice-content").css("display", "none");
 });
 
-$("#invoice-manage-btn").on("click", function () {
-    $("#invoice-content").css("display", "block");
-    $("#item-content").css("display", "none");
-    $("#customer-content").css("display", "none");
-    $("#orders-content").css("display", "none");
-    $("#dashboard-content").css("display", "none");
-});

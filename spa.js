@@ -1,3 +1,98 @@
+//////////////////// Log Out jQueries /////////////////////////////
+// $(document).ready(function () {
+//     $('#logOut-btn').on('click', function () {
+//         Swal.fire({
+//             title: 'Are you sure?',
+//             text: 'You will be logged out.',
+//             icon: 'warning',
+//             showCancelButton: true,
+//             confirmButtonText: 'Yes, log out',
+//             cancelButtonText: 'Cancel'
+//         }).then((result) => {
+//             if (result.isConfirmed) {
+//                 // Clear session data if used
+//                 localStorage.clear();
+//                 sessionStorage.clear();
+//
+//                 // Redirect to login or reload
+//                 window.location.href = 'login.html'; // Change to your login page
+//             }
+//         });
+//     });
+// });
+
+//////////////////// Dashboard  Related jQueries  /////////////////////////////
+function updateDashboardStats() {
+    // Update customer count
+    const customerCount = customer_db.length;
+    $(".card.bg-success h2").text(customerCount);
+
+    // Update product count
+    const productCount = product_db.length;
+    $(".card.bg-primary h2").text(productCount);
+
+    // Update today's orders count
+    const today = new Date().toISOString().split('T')[0];
+    const todaysOrders = order_db.filter(order => {
+        const orderDate = order.date instanceof Date ?
+            order.date.toISOString().split('T')[0] :
+            order.date.split('T')[0];
+        return orderDate === today;
+    }).length;
+    $(".card.bg-warning h2").text(todaysOrders);
+}
+
+function loadRecentOrders() {
+    const recentOrdersTable = $("#dashboard_content table tbody");
+    recentOrdersTable.empty();
+
+    const sortedOrders = [...order_db].sort((a, b) => {
+        const dateA = a.date instanceof Date ? a.date : new Date(a.date);
+        const dateB = b.date instanceof Date ? b.date : new Date(b.date);
+        return dateB - dateA;
+    });
+
+    const recentOrders = sortedOrders.slice(0, 5);
+
+    if (recentOrders.length === 0) {
+        recentOrdersTable.append('<tr><td colspan="5" class="text-center">No recent orders</td></tr>');
+        return;
+    }
+
+    recentOrders.forEach(order => {
+        const orderDate = order.date instanceof Date ?
+            order.date.toLocaleDateString() :
+            new Date(order.date).toLocaleDateString();
+
+        const totalAmount = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+        const row = `<tr>
+            <td>${order.id}</td>
+            <td>${order.customerName || 'N/A'}</td>
+            <td>${orderDate}</td>
+            <td>$${totalAmount.toFixed(2)}</td>
+            <td><span class="badge bg-success">${order.status || 'Completed'}</span></td>
+        </tr>`;
+
+        recentOrdersTable.append(row);
+    });
+}
+
+// Initialize dashboard when page loads
+$(document).ready(function() {
+    // Update dashboard stats when dashboard is shown
+    $("#dash-btn").on("click", function() {
+        updateDashboardStats();
+        loadRecentOrders();
+    });
+
+    // Also update when first loading the page if on dashboard
+    if (window.location.hash === "#dashboard_content" || window.location.hash === "") {
+        updateDashboardStats();
+        loadRecentOrders();
+    }
+});
+
 //////////////////// Customer Related jQueries /////////////////////////////
 let customer_db = JSON.parse(localStorage.getItem('customer_db')) || [];
 let selectedCustomerIndex = -1;
@@ -453,6 +548,10 @@ $(document).ready(function () {
         placeOrder();
     });
 
+    $('#order-place-btn').on('click', function() {
+        placeOrder();
+    });
+
     // New order button
     $('#new_order_btn').on('click', function() {
         generateNextOrderId();
@@ -642,12 +741,14 @@ function placeOrder() {
     });
 }
 
-// Load orders into the table
+////////////////////// Order Management - Complete Working Solution /////////////////////////////
+
+// Load orders into the table with action buttons
 function loadOrdersOnTable() {
     $('#order_tbody').empty();
 
     if (order_db.length === 0) {
-        $('#order_tbody').append('<tr><td colspan="6" class="text-center">No orders found</td></tr>');
+        $('#order_tbody').append('<tr><td colspan="7" class="text-center">No orders found</td></tr>');
         return;
     }
 
@@ -658,37 +759,83 @@ function loadOrdersOnTable() {
                 new Date(order.date).toLocaleDateString()) :
             '-';
 
-        const totalItems = order.items ?
-            order.items.reduce((sum, item) => sum + (item.quantity || 0), 0) :
-            0;
+        const totalItems = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        const totalPrice = order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
 
-        const totalPrice = order.items ?
-            order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0) :
-            0;
-
-        let row = `<tr data-index="${index}">
+        let row = `<tr>
             <td>${order.id || '-'}</td>
             <td>${order.customerName || order.customer || '-'}</td>
             <td>${orderDate}</td>
             <td>${totalItems}</td>
             <td>$${totalPrice.toFixed(2)}</td>
             <td>
-                <button class="btn btn-sm btn-info view-order-btn" data-index="${index}">
-                    <i class="bi bi-eye"></i> Invoice
-                </button>
+                <span class="badge bg-${order.status === 'completed' ? 'success' : 'warning'}">
+                    ${order.status || 'completed'}
+                </span>
+            </td>
+            <td>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-info view-order-btn" data-index="${index}" title="View Invoice">
+                        <i class="bi bi-eye"></i> Invoice
+                    </button>
+                    <button class="btn btn-sm btn-danger delete-order-btn" data-index="${index}" title="Delete Order">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
             </td>
         </tr>`;
         $('#order_tbody').append(row);
     });
+}
 
-    // Add event listeners to view buttons
-    $('.view-order-btn').on('click', function() {
-        const index = $(this).data('index');
-        viewOrderDetails(index);
+// Delete order function
+function deleteOrder(index) {
+    if (index < 0 || index >= order_db.length) {
+        showAlert('Error!', 'Invalid order selected', 'error');
+        return;
+    }
+
+    const order = order_db[index];
+
+    Swal.fire({
+        title: 'Delete Order?',
+        html: `Are you sure you want to delete <b>Order #${order.id}</b> for ${order.customerName}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Restore product quantities
+            order.items.forEach(item => {
+                const product = product_db.find(p => p.id === item.id);
+                if (product) {
+                    product.quantity += item.quantity;
+                }
+            });
+
+            // Remove the order
+            order_db.splice(index, 1);
+            localStorage.setItem('order_db', JSON.stringify(order_db));
+            localStorage.setItem('product_db', JSON.stringify(product_db));
+
+            // Refresh UI
+            loadOrdersOnTable();
+            updateDashboardStats();
+            populateProductDropdown();
+
+            Swal.fire(
+                'Deleted!',
+                `Order #${order.id} has been deleted.`,
+                'success'
+            );
+        }
     });
 }
 
-// View order details
+// View order details/invoice function
 function viewOrderDetails(index) {
     const order = order_db[index];
     if (!order) return;
@@ -700,9 +847,12 @@ function viewOrderDetails(index) {
         '-';
 
     const customer = customer_db.find(c => c.id === order.customerId);
-    const customerInfo = customer ?
-        `${customer.name}<br>${customer.phone}<br>${customer.email || ''}` :
-        'Customer not found';
+    const customerInfo = customer ? `
+        <p><strong>Name:</strong> ${customer.name}</p>
+        <p><strong>Phone:</strong> ${customer.phone}</p>
+        ${customer.email ? `<p><strong>Email:</strong> ${customer.email}</p>` : ''}
+        ${customer.address ? `<p><strong>Address:</strong> ${customer.address}</p>` : ''}
+    ` : 'Customer not found';
 
     let itemsHtml = '';
     order.items.forEach(item => {
@@ -717,18 +867,28 @@ function viewOrderDetails(index) {
     const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
     Swal.fire({
-        title: `Order #${order.id}`,
+        title: `Invoice #${order.id}`,
         html: `
             <div class="text-start">
-                <p><strong>Date:</strong> ${orderDate}</p>
-                <p><strong>Customer:</strong><br>${customerInfo}</p>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h5>Order Details</h5>
+                        <p><strong>Date:</strong> ${orderDate}</p>
+                        <p><strong>Status:</strong> <span class="badge bg-${order.status === 'completed' ? 'success' : 'warning'}">${order.status || 'completed'}</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Customer Details</h5>
+                        ${customerInfo}
+                    </div>
+                </div>
+                
                 <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
                             <tr>
                                 <th>Product</th>
-                                <th>Price</th>
-                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Quantity</th>
                                 <th>Total</th>
                             </tr>
                         </thead>
@@ -737,19 +897,44 @@ function viewOrderDetails(index) {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <th colspan="3">Total</th>
+                                <th colspan="3" class="text-end">Order Total:</th>
                                 <th>$${totalPrice.toFixed(2)}</th>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
-                ${order.notes ? `<p><strong>Notes:</strong> ${order.notes}</p>` : ''}
+                
+                ${order.notes ? `
+                <div class="mt-3">
+                    <h5>Order Notes</h5>
+                    <p>${order.notes}</p>
+                </div>` : ''}
             </div>
         `,
-        width: '800px',
-        confirmButtonText: 'Close'
+        width: '900px',
+        confirmButtonText: 'Close',
+        customClass: {
+            popup: 'text-start'
+        }
     });
 }
+
+// Initialize event listeners
+$(document).ready(function () {
+    // Delete order button
+    $(document).on('click', '.delete-order-btn', function(e) {
+        e.stopPropagation();
+        const index = $(this).data('index');
+        deleteOrder(index);
+    });
+
+    // View invoice button
+    $(document).on('click', '.view-order-btn', function(e) {
+        e.stopPropagation();
+        const index = $(this).data('index');
+        viewOrderDetails(index);
+    });
+});
 
 // Filter orders
 function filterOrders(searchTerm) {
@@ -769,6 +954,7 @@ function showAlert(title, text, icon) {
         confirmButtonText: 'OK'
     });
 }
+
 
 //////////////////////////////////////////////////////////////////////
 $(document).ready(function () {
